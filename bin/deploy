@@ -1,0 +1,33 @@
+#!/bin/bash
+
+cd $(dirname $0)
+
+set -e -o pipefail
+
+cmd () {
+  set -x
+  "$@"
+  { set +x; } 2>/dev/null
+}
+export -f cmd
+
+if [ -z "$VM_INSTANCE" ]; then
+  echo "Missing VM_INSTANCE environment variable" >&2
+  exit 1
+fi
+
+export DOCKER_HOST=ssh://${VM_INSTANCE}
+
+cmd docker pull gcr.io/datadoghq/agent:7
+
+cmd docker service create \
+  --name dd-agent \
+  --mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock,readonly=true \
+  --mount type=bind,source=/proc/,target=/host/proc/,readonly=true \
+  --mount type=bind,source=/sys/fs/cgroup/,target=/host/sys/fs/cgroup,readonly=true \
+  --mount type=bind,source=/etc/os-release,target=/host/etc/os-release,readonly=true \
+  --env DD_API_KEY=3bc2d8925ea72fc48beca488340c1948 \
+  --env DD_SITE="us5.datadoghq.com" \
+  --limit-cpu 0.1 \
+  --limit-memory 128m \
+  gcr.io/datadoghq/agent:7
